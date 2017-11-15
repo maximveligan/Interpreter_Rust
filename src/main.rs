@@ -6,6 +6,8 @@
 extern crate nom;
 use std::io::{self, Read};
 
+const ENGLISH_ALPHA: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 #[derive(Debug)]
 enum Token{
     Integer(i64),
@@ -35,6 +37,7 @@ enum Punctuation {
     GreaterThan,
     LesserEq,
     GreaterEq,
+    Semicolon,
 }
 
 #[derive(Clone, Debug)]
@@ -62,7 +65,7 @@ named!(key_word(&str) -> Keyword, alt!(
 
 named!(identifier(&str) -> Token, 
                 map!(recognize!(tuple!(one_of!(
-                                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+                                ENGLISH_ALPHA),
                                 take_while_s!(char::is_alphanumeric))),
                                 |name| Token::Identifier(name.to_string())));
 
@@ -91,7 +94,8 @@ named!(punctuation(&str) -> Punctuation, ws!(alt!(
             preceded!(tag!("/"), value!(Punctuation::Divide)) | preceded!(tag!("%"), value!(Punctuation::Modulo)) |  
             preceded!(tag!(":="), value!(Punctuation::ColonEquals)) | preceded!(tag!("!="), value!(Punctuation::NotEquals)) |  
             preceded!(tag!("<"), value!(Punctuation::LesserThan)) | preceded!(tag!(">"), value!(Punctuation::GreaterThan)) |  
-            preceded!(tag!(">="), value!(Punctuation::LesserEq)) | preceded!(tag!("<="), value!(Punctuation::GreaterEq))))); 
+            preceded!(tag!(">="), value!(Punctuation::LesserEq)) | preceded!(tag!(";"), value!(Punctuation::Semicolon)) |
+            preceded!(tag!("<="), value!(Punctuation::GreaterEq))))); 
 
 named!(integer(&str) -> Token, map_res!(take_while_s!(apply!(char::is_digit, 10)), |int: &str| int.parse::<i64>().map(Token::Integer)));
 
@@ -120,38 +124,39 @@ fn get_tokens(text: &str) -> Vec<Token> {
 
 fn read_tokens(tokens: &Vec<Token>) -> () {
     for token in tokens {
-        match token {
-            &Token::Integer(i) => println!("Integer: {}", i),
-            &Token::Identifier(ref s) => println!("Identifier: {}", s),
-            &Token::Boolean(tf) => println!("Boolean: {}", tf),
-            &Token::Real(f) => println!("Real number: {}", f),
-            &Token::Punctuation(Punctuation::OpenParen) => println!("OpenParen"),
-            &Token::Punctuation(Punctuation::CloseParen) => println!("CloseParen"), 
-            &Token::Punctuation(Punctuation::OpenCurly) => println!("OpenCurly"),
-            &Token::Punctuation(Punctuation::CloseCurly) => println!("CloseCurly"),
-            &Token::Punctuation(Punctuation::Coma) => println!("Coma"),
-            &Token::Punctuation(Punctuation::Plus) => println!("Plus"),
-            &Token::Punctuation(Punctuation::Minus) => println!("Minus"),
-            &Token::Punctuation(Punctuation::Multiply) => println!("Multiply)"),
-            &Token::Punctuation(Punctuation::Divide) => println!("Divide"),
-            &Token::Punctuation(Punctuation::Modulo) => println!("Modulo"),
-            &Token::Punctuation(Punctuation::ColonEquals) => println!("ColonEquals"),
-            &Token::Punctuation(Punctuation::NotEquals) => println!("NotEquals"),
-            &Token::Punctuation(Punctuation::LesserThan) => println!("LesserThan"),
-            &Token::Punctuation(Punctuation::GreaterThan) => println!("GreaterThan"),
-            &Token::Punctuation(Punctuation::LesserEq) => println!("LesserEq"),
-            &Token::Punctuation(Punctuation::GreaterEq) => println!("GreaterEq"),
-            &Token::Keyword(Keyword::Var) => println!("Keyword: Var"),
-            &Token::Keyword(Keyword::Fun) => println!("Keyword: Fun"),
-            &Token::Keyword(Keyword::If) => println!("Keyword: If"),
-            &Token::Keyword(Keyword::Else) => println!("Keyword: Else"),
-            &Token::Keyword(Keyword::Return) => println!("Keyword: Return"),
-            &Token::Keyword(Keyword::Read) => println!("Keyword: Read"),
-            &Token::Keyword(Keyword::Write) => println!("Keyword: Write"),
-            &Token::Keyword(Keyword::Not) => println!("Keyword: Not"),
-            &Token::Keyword(Keyword::Or) => println!("Keyword: Or"),
-            &Token::Keyword(Keyword::And) => println!("Keyword: And"),
-            &Token::Invalid(ref s) => println!("Invalid token {}", s),
+        match *token {
+            Token::Integer(i) => println!("Integer: {}", i),
+            Token::Identifier(ref s) => println!("Identifier: {}", s),
+            Token::Boolean(tf) => println!("Boolean: {}", tf),
+            Token::Real(f) => println!("Real number: {}", f),
+            Token::Punctuation(Punctuation::OpenParen) => println!("("),
+            Token::Punctuation(Punctuation::CloseParen) => println!(")"), 
+            Token::Punctuation(Punctuation::OpenCurly) => println!("{{"),
+            Token::Punctuation(Punctuation::CloseCurly) => println!("}}"),
+            Token::Punctuation(Punctuation::Coma) => println!(","),
+            Token::Punctuation(Punctuation::Plus) => println!("+"),
+            Token::Punctuation(Punctuation::Minus) => println!("-"),
+            Token::Punctuation(Punctuation::Multiply) => println!("*)"),
+            Token::Punctuation(Punctuation::Divide) => println!("/"),
+            Token::Punctuation(Punctuation::Modulo) => println!("%"),
+            Token::Punctuation(Punctuation::ColonEquals) => println!(":="),
+            Token::Punctuation(Punctuation::NotEquals) => println!("!="),
+            Token::Punctuation(Punctuation::LesserThan) => println!("<"),
+            Token::Punctuation(Punctuation::GreaterThan) => println!(">"),
+            Token::Punctuation(Punctuation::LesserEq) => println!("<="),
+            Token::Punctuation(Punctuation::GreaterEq) => println!(">="),
+            Token::Punctuation(Punctuation::Semicolon) => println!(";"),
+            Token::Keyword(Keyword::Var) => println!("Keyword: Var"),
+            Token::Keyword(Keyword::Fun) => println!("Keyword: Fun"),
+            Token::Keyword(Keyword::If) => println!("Keyword: If"),
+            Token::Keyword(Keyword::Else) => println!("Keyword: Else"),
+            Token::Keyword(Keyword::Return) => println!("Keyword: Return"),
+            Token::Keyword(Keyword::Read) => println!("Keyword: Read"),
+            Token::Keyword(Keyword::Write) => println!("Keyword: Write"),
+            Token::Keyword(Keyword::Not) => println!("Keyword: Not"),
+            Token::Keyword(Keyword::Or) => println!("Keyword: Or"),
+            Token::Keyword(Keyword::And) => println!("Keyword: And"),
+            Token::Invalid(ref s) => println!("Invalid token {}", s),
         }
     }
 }
