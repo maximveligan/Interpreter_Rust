@@ -13,6 +13,7 @@ use parser::parse_program;
 
 mod token;
 mod parser;
+mod evaluator;
 //mod ast;
 
 fn main() {

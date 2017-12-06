@@ -1,8 +1,49 @@
+use parser::Block;
+use ast::Expr;
+
 use parser::Program;
 use parser::Cmd;
 use parser::Constant;
+use parser::Id;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
-fn evaluate_program(program: Program) {
+struct CallStack(Vec<Frame>);
+struct Frame(Vec<Scope>);
+struct Scope(HashMap<Id, Option<Constant>>);
+struct GlobalScope(Scope);
+
+impl CallStack {
+    pub fn new() -> CallStack {
+        CallStack(Vec::new())
+    }
+    fn get_frames(&self) -> Vec<Frame> {
+        self.0
+    }
+    fn get_last_scopes(&self) -> Option<Vec<Scope>> {
+        match self.get_frames().last() {
+            Some(scopes) => Some(scopes.0),
+            None => None,
+        }
+    }
+    fn lookup(self, id: Id) -> Option<Option<Constant>> {
+        self.get_last_scopes().unwrap_or(Vec::new()).iter().rev().for_each(|scope| -> Option<Option<Constant>> {scope.0.get(&id)});
+        None
+    }
+}
+
+impl GlobalScope {
+    pub fn new(vars: HashSet<Id>) -> GlobalScope {
+        let mut hash_map: HashMap<Id, Option<Constant>> = HashMap::new();
+        vars.iter().for_each(|var| hash_map.insert(*var, None));
+
+        GlobalScope(Scope(hash_map))
+    }
+}
+
+fn evaluate_program(program: Program) -> Result<(), String>{
+    let call_stack = CallStack::new();
+    let global_scope = GlobalScope::new(program.vars);
     program.cmds.iter().for_each(evaluate_cmd);
 }
 
@@ -10,12 +51,12 @@ fn evaluate_cmd(cmd: Cmd) {
     match cmd {
         Cmd::Read(_) => println!("Warning! Reading is not supported!"),
         Cmd::Write(id) => println!("{:?}", id),
-        Cmd::Block(Block),
-        Cmd::Return(Expr),
-        Cmd::While { expr: Expr, block: Block },
-        Cmd::If { expr: Expr, block: Block },
-        Cmd::Assignment { var: Id, expr: Expr },
-        Cmd::FunCall { var: Id, fun: Id, exprs: Vec<Expr> },
+        Cmd::Block(Block) => panic!("not done"),
+        Cmd::Return(Expr) => panic!("not done"),
+        Cmd::While { expr, block} => panic!("not done"),
+        Cmd::If { expr, block} => panic!("not done"),
+        Cmd::Assignment { var, expr} => panic!("not done"),
+        Cmd::FunCall { var, fun} => panic!("not done"),
     }
 }
 
