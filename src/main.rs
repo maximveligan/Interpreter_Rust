@@ -14,7 +14,7 @@ use parser::parse_program;
 mod token;
 mod parser;
 mod evaluator;
-//mod ast;
+mod ast;
 
 fn main() {
     let mut buffer = String::new();

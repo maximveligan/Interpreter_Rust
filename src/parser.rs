@@ -7,24 +7,23 @@ use token::Token;
 use token::Keyword;
 use token::Punctuation;
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct Id(String);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
-    id: Id,
-    parameters: HashSet<Id>,
-    block: Block,
-    value: Option<Expr>,
+    pub id: Id,
+    pub parameters: HashSet<Id>,
+    pub block: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
-    vars: HashSet<Id>,
-    cmds: Vec<Cmd>,
+    pub vars: HashSet<Id>,
+    pub cmds: Vec<Cmd>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Cmd {
     Read(Id),
     Write(Id),
@@ -36,26 +35,26 @@ pub enum Cmd {
     FunCall { var: Id, fun: Id, exprs: Vec<Expr> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     pub simple_expr: SimpleExpr,
     pub relation: Option<(RelOp, SimpleExpr)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SimpleExpr {
     pub sign: SignOp,
     pub term: Term,
     pub term_chain: Vec<(AddOp, Term)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Term {
     pub factor: Factor,
     pub fac_chain: Vec<(MulOp, Factor)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Factor {
     Constant(Constant),
     Id(Id),
@@ -63,34 +62,34 @@ pub enum Factor {
     Expr(Box<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Constant {
     Bool(bool),
     Int(i64),
     Real(f64),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub vars: HashSet<Id>,
     pub funcs: Vec<Function>,
     pub cmds: Vec<Cmd>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AddOp {
     Add,
     Sub,
     Or,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SignOp {
     Pos,
     Neg,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MulOp {
     Mul,
     Div,
@@ -98,7 +97,7 @@ pub enum MulOp {
     And,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RelOp {
     Equal,
     NEqual,
@@ -113,6 +112,13 @@ pub fn parse_program(input: &[Token]) -> Result<Program, Vec<String>> {
     let (tail, funcs, fun_err) = parse_funcs(rest);
     let (tok_tail, cmds, cmd_err) = parse_cmds(tail);
     if tok_tail.is_empty() {
+        for cmd in cmds.iter() {
+            match *cmd {
+                Cmd::Return(_) => return Err(vec!["Found return keyword outside of a function".to_string()]),
+                _ => (),
+            }
+        }
+
         Ok(Program {
             vars: vars,
             funcs: funcs,
@@ -247,7 +253,6 @@ fn parse_func(mut input: &[Token]) -> Result<(&[Token], Function), String> {
             id: fun_id,
             parameters: parameters,
             block: block,
-            value: None,
         },
     ))
 }

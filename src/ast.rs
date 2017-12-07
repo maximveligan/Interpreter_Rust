@@ -7,12 +7,14 @@ use parser::Id;
 use parser::Factor;
 use parser::SimpleExpr;
 use parser::Constant;
+use evaluator::bool_to_int;
 use parser;
 
-enum Expr {
+pub enum Expr {
     BinOp(Box<Expr>, BinOp, Box<Expr>),
     Id(Id),
     Constant(Constant),
+    NegId(Id),
 }
 
 enum BinOp {
@@ -43,6 +45,7 @@ impl From<parser::Expr> for Expr {
     //                }
     //        }
     //    }
+    Expr::Constant(Constant::Bool(true))
     }
 }
 
@@ -60,7 +63,7 @@ fn expr_from_parse_expr(parse_expr: parser::Expr) -> Expr {
     }
 }
 
-fn expr_from_simple(simple: SimpleExpr) -> Expr {
+fn expr_from_simple(mut simple: SimpleExpr) -> Expr {
     match simple.sign {
         SignOp::Pos => {
             match simple.term_chain.pop() {
@@ -73,12 +76,32 @@ fn expr_from_simple(simple: SimpleExpr) -> Expr {
             }
         }
         SignOp::Neg => {
-
+            match simple.term_chain.pop() {
+                Some(term_c) => match term_c.0 {
+                    AddOp::Add => Expr::BinOp(Box::new(expr_from_term(term_c.1)), BinOp::Add, Box::new(expr_from_simple(simple))),
+                    AddOp::Sub => Expr::BinOp(Box::new(expr_from_term(term_c.1)), BinOp::Sub, Box::new(expr_from_simple(simple))),
+                    AddOp::Or => Expr::BinOp(Box::new(expr_from_term(term_c.1)), BinOp::Or, Box::new(expr_from_simple(simple))),               
+                },
+                None => negative_from_expr(expr_from_term(simple.term)),
+            }
         }
     }
 }
 
-fn expr_from_term(term: Term) -> Expr {
+fn negative_from_expr(mut expr: Expr) -> Expr {
+    match expr {
+        Expr::Constant(c) => match c {
+            Constant::Bool(b) => Expr::Constant(Constant::Int(bool_to_int(b) * -1)),
+            Constant::Real(r) => Expr::Constant(Constant::Real((r * -1.0))),
+            Constant::Int(i) => Expr::Constant(Constant::Int(i.checked_neg().expect("Cannot make such a large number negative"))),
+        },
+        Expr::Id(id) => Expr::NegId(id),
+        Expr::NegId(_) => panic!("This shouldn't be possible. Factor somehow created a negative id"),
+        Expr::BinOp(l, c, tree) => Expr::BinOp(l, c, Box::new(negative_from_expr(*tree))),
+    }
+}
+
+fn expr_from_term(mut term: Term) -> Expr {
     match term.fac_chain.pop() {
         Some(fac_ch) => match fac_ch.0 {
             MulOp::Mul => Expr::BinOp(Box::new(expr_from_factor(fac_ch.1)), BinOp::Mul, Box::new(expr_from_term(term))),
