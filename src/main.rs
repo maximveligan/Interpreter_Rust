@@ -22,7 +22,12 @@ fn main() {
     let tokens: Vec<Token> = get_tokens(&buffer);
 
     match parse_program(&tokens) {
-        Ok(program) => println!("Program parsed successfuly, here is the tree {:#?}", program),
+        Ok(program) => {
+            println!(
+                "Program parsed successfuly, here is the tree {:#?}",
+                program
+            )
+        }
         Err(messages) => {
             for errors in messages {
                 println!("Parsing failed due to following errors: {}", errors);
