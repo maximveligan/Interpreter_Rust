@@ -1,4 +1,5 @@
 use ast::Expr;
+use ast::BinOp;
 use parser::Block;
 use parser::Function;
 use parser::Program;
@@ -8,11 +9,13 @@ use parser::Id;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+#[derive(Debug)]
 struct CallStack(Vec<Frame>);
 
+#[derive(Debug)]
 struct Frame(Vec<Scope>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Scope(HashMap<Id, Option<Constant>>);
 
 enum Effect {
@@ -107,7 +110,7 @@ impl Frame {
     }
 }
 
-fn evaluate_program(program: Program) -> Result<(), String> {
+pub fn evaluate_program(program: Program) -> Result<(), String> {
     let mut funcs: HashMap<Id, (Vec<Id>, Block)> = HashMap::new();
     let mut callstack = CallStack::new();
     callstack.push_new_frame();
@@ -148,10 +151,14 @@ fn evaluate_cmds(
 ) -> Effect {
     let mut effect: Option<Effect> = None;
     for cmd in cmds.iter() {
+        println!("{:#?}",  callstack);
         match *cmd {
             Cmd::Read(_) => println!("Warning! Reading is not supported!"),
-            Cmd::Write(ref id) => println!("{:?}", callstack.lookup(id)),
-            Cmd::Block(ref block) => panic!("not done"),
+            Cmd::Write(ref id) => {match callstack.lookup(id) {
+                Some(c)  => {effect = Some(Effect::Okay); println!("{:?}", c);},
+                None => effect = Some(Effect::Error(format!("Tried to print variable without defining it {:?}", id))),
+            }}
+            Cmd::Block(ref block) => effect = Some(evaluate_block(funcs, block, callstack)),
             Cmd::Return(ref expr) => {
                 callstack.get_last_frame().pop();
                 return Effect::Return(Expr::from(expr.clone()));
@@ -185,7 +192,7 @@ fn evaluate_cmds(
                 ref var,
                 ref fun,
                 ref exprs,
-            } => panic!("not done"),
+            } => effect = Some(evaluate_fun_call(funcs, var, fun, exprs.clone().into_iter().map(Expr::from).collect(), callstack)),
         }
         if let &Some(ref eff) = &effect {
             match *eff {
@@ -219,7 +226,7 @@ fn evaluate_while(
     block: Block,
     callstack: &mut CallStack,
 ) -> Effect {
-    match evaluate_expr(expr) {
+    match evaluate_expr(expr, callstack) {
         Ok(c) => {
             match c {
                 Constant::Bool(b) => {
@@ -264,7 +271,7 @@ fn evaluate_if(
     block: Block,
     callstack: &mut CallStack,
 ) -> Effect {
-    match evaluate_expr(expr) {
+    match evaluate_expr(expr, callstack) {
         Ok(c) => {
             match c {
                 Constant::Bool(b) => {
@@ -310,6 +317,10 @@ pub fn bool_to_int(b: bool) -> i64 {
     if b { 1 } else { 0 }
 }
 
+pub fn bool_to_real(b: bool) -> f64 {
+    if b { 1.0 } else { 0.0 }
+}
+
 fn real_to_bool(real: f64) -> bool {
     real != 0.0
 }
@@ -319,7 +330,7 @@ fn int_to_bool(int: i64) -> bool {
 }
 
 fn evaluate_assign(var: &Id, expr: Expr, callstack: &mut CallStack) -> Effect {
-    match evaluate_expr(expr) {
+    match evaluate_expr(expr, callstack) {
         Ok(c) => {
             match callstack.set_var(&var, &c) {
                 Ok(()) => Effect::Okay,
@@ -341,7 +352,7 @@ fn evaluate_fun_call(
     if funcs.contains_key(fun) {
         match param_vals
             .into_iter()
-            .map(|param| evaluate_expr(Expr::from(param)))
+            .map(|param| evaluate_expr(Expr::from(param), callstack))
             .collect::<Result<Vec<Constant>, String>>() {
             Ok(params) => {
                 if ((params.len() == (funcs.get(fun).expect("Checked earlier for this error. Should've gotten a key")).0.len()))
@@ -369,6 +380,392 @@ fn evaluate_fun_call(
     }
 }
 
-fn evaluate_expr(expr: Expr) -> Result<Constant, String> {
-    Ok(Constant::Bool(true))
+fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, String> {
+    match expr {
+        Expr::Constant(c) => match c {
+            Constant::Bool(b) => Ok(Constant::Bool(b)),
+            Constant::Int(i) => Ok(Constant::Int(i)),
+            Constant::Real(r) => Ok(Constant::Real(r)),
+        }
+        Expr::Id(id) => match callstack.lookup(&id) {
+            Some(oc) => match oc {
+                Some(c) => match c {
+                    Constant::Bool(b) => Ok(Constant::Bool(b)),
+                    Constant::Int(i) => Ok(Constant::Int(i)),
+                    Constant::Real(r) => Ok(Constant::Real(r)),
+                }
+                None => Err(format!("Null pointer. Did not bind a value to variable {:#?}", id)),
+
+            }
+
+            None => Err(format!("No such variable exists {:#?}", id)),
+        }
+
+        Expr::NegId(nid) => match callstack.lookup(&nid) {
+            Some(oc) => match oc {
+                Some(c) => match c {
+                    Constant::Bool(b) => Ok(Constant::Int(-1 * bool_to_int(b))),
+                    Constant::Int(i) => Ok(Constant::Int(i.checked_neg().expect("Cannot make such a large number negative"))),
+                    Constant::Real(r) => Ok(Constant::Real(r * -0.1)),
+                }
+                None => Err(format!("Null pointer. Did not  bind a value to variable {:#?}", nid)),
+            }
+            None => Err(format!("No such variable exists {:#?}", nid)),
+        }
+
+        Expr::BinOp(l, bo, r) => match bo {
+            BinOp::Add => Ok(add_constants(match evaluate_expr(*l, callstack) {
+               Ok(c) => c,
+               Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack){ 
+                Ok(c) => c,
+                Err(msg) => return Err(msg)
+            })),
+            BinOp::Sub => Ok(sub_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg)
+            })),
+            BinOp::Or => Ok(or_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Mul => Ok(mul_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Div => Ok(div_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Mod => Ok(mod_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::And => Ok(and_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Equal => Ok(equal_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::NEqual => Ok(nEqual_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Greater => Ok(greater_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::Lesser => Ok(lesser_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::GreaterEq => Ok(greaterEq_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+            BinOp::LesserEq => Ok(lessereq_constants(match evaluate_expr(*l, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            }, match evaluate_expr(*r, callstack) {
+                Ok(c) => c,
+                Err(msg) => return Err(msg),
+            })),
+        }
+    }
+}
+
+fn add_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Real((r + r2)),
+            Constant::Int(i2) => Constant::Real((r + (i2 as f64))),
+            Constant::Bool(b2) => {if b2 {return Constant::Real((1.0 + r))} else {return Constant::Real(r)}},
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Real((r2 + (i as f64))),
+            Constant::Int(i2) => Constant::Int((i2 + i)),
+            Constant::Bool(b2) => {if b2 {return Constant::Int((1 + i))} else {return Constant::Int(i)}},
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>{if b {return Constant::Real((1.0 + r2))} else {return Constant::Real(r2)}},
+            Constant::Int(i2) =>{if b {return Constant::Int((1 + i2))} else {return Constant::Int(i2)}},
+            Constant::Bool(b2) =>{if b && b2 {return Constant::Int(2)} else if b || b2 {return Constant::Int(1)} else {return Constant::Int(0)}},
+        }
+    }
+}
+
+fn sub_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Real((r - r2)),
+            Constant::Int(i2) => Constant::Real((r - (i2 as f64))),
+            Constant::Bool(b2) => {if b2 {return Constant::Real((r - 1.0))} else {return Constant::Real(r)}},
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Real(((i as f64) - r2)),
+            Constant::Int(i2) => Constant::Int((i - i2)),
+            Constant::Bool(b2) => {if b2 {return Constant::Int((i - 1))} else {return Constant::Int(i)}},
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>{if b {return Constant::Real((1.0 - r2))} else {return Constant::Real((0.0 - r2))}},
+            Constant::Int(i2) =>{if b {return Constant::Int((1 - i2))} else {return Constant::Int((0 - i2))}},
+            Constant::Bool(b2) =>{if b && b2 {return Constant::Int(0)} else if (b && (!b2)) {return Constant::Int(0)} else {return Constant::Int(-1)}},
+        }
+    }
+}
+
+fn or_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) || real_to_bool(r))),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) || real_to_bool(r))),
+            Constant::Bool(b2) => Constant::Bool((b2 || real_to_bool(r))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) || int_to_bool(i))),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) || int_to_bool(i))),
+            Constant::Bool(b2) => Constant::Bool((b2 || int_to_bool(i))),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) || b)),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) || b)),
+            Constant::Bool(b2) => Constant::Bool((b2 || b)),
+        }
+    }
+}
+
+fn mul_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Real((r * r2)), 
+            Constant::Int(i2) => Constant::Real((r * (i2 as f64))),
+            Constant::Bool(b2) => {if b2 {return Constant::Real(r)} else {return Constant::Real(0.0)}},
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Real((r2 * (i as f64))),
+            Constant::Int(i2) => Constant::Int((i2 * i)),
+            Constant::Bool(b2) => {if b2 {return Constant::Int(i)} else {return Constant::Int(0)}},
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>{if b {return Constant::Real(r2)} else {return Constant::Real(0.0)}},
+            Constant::Int(i2) =>{if b {return Constant::Int(i2)} else {return Constant::Int(0)}},
+            Constant::Bool(b2) =>{if b && b2 {return Constant::Int(1)} else {return Constant::Int(0)}},
+        }
+    }
+}
+
+fn div_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Real((r / r2)),
+            Constant::Int(i2) => Constant::Real((r / (i2 as f64))),
+            Constant::Bool(b2) => {if b2 {return Constant::Real((r / 1.0))} else {panic!("Tried to divide by 0")}},
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Real(((i as f64) / r2)),
+            Constant::Int(i2) => Constant::Int((i / i2)),
+            Constant::Bool(b2) => {if b2 {return Constant::Int((i / 1))} else {panic!("Tried to divide by 0")}},
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>{if b {return Constant::Real((1.0 / r2))} else {panic!("Tried to divide by 0")}},
+            Constant::Int(i2) =>{if b {return Constant::Int((1 / i2))} else {panic!("Tried to divide by 0")}},
+            Constant::Bool(b2) =>{if b && b2 {return Constant::Int(1)} else if (b && (!b2)) {panic!("Tried to divide by 0")} else {return Constant::Int(0)}},
+        }
+    }
+}
+
+fn mod_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Real((r % r2)),
+            Constant::Int(i2) => Constant::Real((r % (i2 as f64))),
+            Constant::Bool(b2) => {if b2 {return Constant::Real((r % 1.0))} else {panic!("Tried to mod by 0")}},
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Real(((i as f64) % r2)),
+            Constant::Int(i2) => Constant::Int((i % i2)),
+            Constant::Bool(b2) => {if b2 {return Constant::Int((i % 1))} else {panic!("Tried to mod by 0")}},
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>{if b {return Constant::Real((1.0 % r2))} else {panic!("Tried to mod by 0")}},
+            Constant::Int(i2) =>{if b {return Constant::Int((1 % i2))} else {panic!("Tried to mod by 0")}},
+            Constant::Bool(b2) =>{if b && b2 {return Constant::Int((1))} else if (b && (!b2)) {panic!("Tried to mod by 0")} else {return Constant::Int(0)}},
+        }
+    }
+}
+
+fn and_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r) => match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) && real_to_bool(r))),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) && real_to_bool(r))),
+            Constant::Bool(b2) => Constant::Bool((b2 && real_to_bool(r))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) && int_to_bool(i))),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) && int_to_bool(i))),
+            Constant::Bool(b2) => Constant::Bool((b2 && int_to_bool(i))),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) => Constant::Bool((real_to_bool(r2) && b)),
+            Constant::Int(i2) => Constant::Bool((int_to_bool(i2) && b)),
+            Constant::Bool(b2) => Constant::Bool((b2 && b)),
+        }
+    }
+}
+
+fn equal_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 {
+            Constant::Real(r2) => Constant::Bool((r == r2)),
+            Constant::Int(i2) => Constant::Bool((r == (i2 as f64))),
+            Constant::Bool(b2) => Constant::Bool((r == bool_to_real(b2))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool(((i as f64) == r2)),
+            Constant::Int(i2) =>Constant::Bool((i == i2)),
+            Constant::Bool(b2) =>Constant::Bool((bool_to_int(b2) == i)),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool((bool_to_real(b) == r2)),
+            Constant::Int(i2) =>Constant::Bool((bool_to_int(b) == i2)),
+            Constant::Bool(b2) =>Constant::Bool((b2 == b)),
+        }
+    }
+}
+
+fn nEqual_constants(c1: Constant, c2: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 {
+            Constant::Real(r2) => Constant::Bool((r != r2)),
+            Constant::Int(i2) => Constant::Bool((r != (i2 as f64))),
+            Constant::Bool(b2) => Constant::Bool((r != bool_to_real(b2))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool(((i as f64) != r2)),
+            Constant::Int(i2) =>Constant::Bool((i != i2)),
+            Constant::Bool(b2) =>Constant::Bool((bool_to_int(b2) != i)),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool((bool_to_real(b) != r2)),
+            Constant::Int(i2) =>Constant::Bool((bool_to_int(b) != i2)),
+            Constant::Bool(b2) =>Constant::Bool((b2 != b)),
+        }
+    }
+}
+
+fn greater_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 {
+            Constant::Real(r2) => Constant::Bool((r > r2)),
+            Constant::Int(i2) => Constant::Bool((r > (i2 as f64))),
+            Constant::Bool(b2) => Constant::Bool((r > bool_to_real(b2))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool(((i as f64) > r2)),
+            Constant::Int(i2) =>Constant::Bool((i > i2)),
+            Constant::Bool(b2) =>Constant::Bool((i > bool_to_int(b2))),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool((bool_to_real(b) > r2)),
+            Constant::Int(i2) =>Constant::Bool((bool_to_int(b) > i2)),
+            Constant::Bool(b2) =>Constant::Bool((bool_to_int(b) > bool_to_int(b2))),
+        }
+    }
+}
+
+fn lesser_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 {
+            Constant::Real(r2) => Constant::Bool((r < r2)),
+            Constant::Int(i2) => Constant::Bool((r < (i2 as f64))),
+            Constant::Bool(b2) => Constant::Bool((r < bool_to_real(b2))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool(((i as f64) < r2)),
+            Constant::Int(i2) =>Constant::Bool((i < i2)),
+            Constant::Bool(b2) =>Constant::Bool((i < bool_to_int(b2))),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool((bool_to_real(b) < r2)),
+            Constant::Int(i2) =>Constant::Bool((bool_to_int(b) < i2)),
+            Constant::Bool(b2) =>Constant::Bool((bool_to_int(b) < bool_to_int(b2))),
+        }
+    }
+}
+
+fn greaterEq_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 {
+            Constant::Real(r2) => Constant::Bool((r >= r2)),
+            Constant::Int(i2) => Constant::Bool((r >= (i2 as f64))),
+            Constant::Bool(b2) => Constant::Bool((r >= bool_to_real(b2))),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool(((i as f64) >= r2)),
+            Constant::Int(i2) =>Constant::Bool((i >= i2)),
+            Constant::Bool(b2) =>Constant::Bool((i >= bool_to_int(b2))),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool((bool_to_real(b) >= r2)),
+            Constant::Int(i2) =>Constant::Bool((bool_to_int(b) >= i2)),
+            Constant::Bool(b2) =>Constant::Bool((bool_to_int(b) >= bool_to_int(b2))),
+        }
+    }
+}
+
+
+fn lessereq_constants(c2: Constant, c1: Constant) -> Constant {
+    match c1 {
+        Constant::Real(r)  => match c2 { 
+            Constant::Real(r2) => Constant::Bool(r <= r2),
+            Constant::Int(i2) => Constant::Bool(r <= (i2 as f64)),
+            Constant::Bool(b2) => Constant::Bool(r <= bool_to_real(b2)),
+        }
+        Constant::Int(i) => match c2 {
+            Constant::Real(r2) => Constant::Bool((i as f64) <= r2),
+            Constant::Int(i2) =>Constant::Bool(i <= i2),
+            Constant::Bool(b2) =>Constant::Bool(i <= bool_to_int(b2)),
+        }
+        Constant::Bool(b) =>  match c2 {
+            Constant::Real(r2) =>Constant::Bool(bool_to_real(b) <= r2),
+            Constant::Int(i2) =>Constant::Bool(bool_to_int(b) <= i2),
+            Constant::Bool(b2) =>Constant::Bool(bool_to_int(b) <= bool_to_int(b2)),
+        }
+    }
 }

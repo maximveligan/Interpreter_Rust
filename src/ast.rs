@@ -10,6 +10,7 @@ use parser::Constant;
 use evaluator::bool_to_int;
 use parser;
 
+#[derive(Debug)]
 pub enum Expr {
     BinOp(Box<Expr>, BinOp, Box<Expr>),
     Id(Id),
@@ -17,7 +18,8 @@ pub enum Expr {
     NegId(Id),
 }
 
-enum BinOp {
+#[derive(Debug)]
+pub enum BinOp {
     Add,
     Sub,
     Or,
@@ -35,17 +37,7 @@ enum BinOp {
 
 impl From<parser::Expr> for Expr {
     fn from(parse_expr: parser::Expr) -> Expr {
-        //    match parse_expr.relation {
-        //        Some(rel) =>
-        //        None => { if (parse_expr.simple_expr.term_chain.is_empty()) {
-        //
-        //                }
-        //                else {
-
-        //                }
-        //        }
-        //    }
-        Expr::Constant(Constant::Bool(true))
+        expr_from_parse_expr(parse_expr)
     }
 }
 

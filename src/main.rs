@@ -10,6 +10,7 @@ use token::read_tokens;
 use token::get_tokens;
 use token::Token;
 use parser::parse_program;
+use evaluator::evaluate_program;
 
 mod token;
 mod parser;
@@ -26,7 +27,11 @@ fn main() {
             println!(
                 "Program parsed successfuly, here is the tree {:#?}",
                 program
-            )
+            );
+            match evaluate_program(program) {
+                Ok(()) => println!("Evaluated successfuly"),
+                Err(msg) => println!("Program failed at {:?}", msg),
+            }
         }
         Err(messages) => {
             for errors in messages {
