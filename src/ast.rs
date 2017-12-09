@@ -1,3 +1,6 @@
+// Maxim Veligan
+// Programming Languages
+
 use parser::MulOp;
 use evaluator::real_to_bool;
 use evaluator::int_to_bool;

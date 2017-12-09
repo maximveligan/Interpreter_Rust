@@ -1,3 +1,6 @@
+// Maxim Veligan
+// Programming Languages
+
 use ast::Expr;
 use ast::BinOp;
 use parser::Block;
@@ -224,17 +227,38 @@ fn evaluate_while(
                 match c {
                     Constant::Bool(b) => {
                         if (b) {
-                            return evaluate_block(funcs, &block, callstack)
+                            match evaluate_block(funcs, &block, callstack) {
+                                Effect::Okay => (),
+                                Effect::Return(val) => return Effect::Return(val),
+                                Effect::Error(msg) =>return Effect::Error(msg),
+                            }
+                        }
+                        else {
+                            return Effect::Okay
                         }
                     }
                     Constant::Real(r) => {
                         if (real_to_bool(r)) {
-                            return evaluate_block(funcs, &block, callstack)
+                            match evaluate_block(funcs, &block, callstack) {
+                                Effect::Okay => (),
+                                Effect::Return(val) => return Effect::Return(val),
+                                Effect::Error(msg) =>return Effect::Error(msg),
+                            }
+                        }
+                        else {
+                            return Effect::Okay
                         }
                     }
                     Constant::Int(i) => {
                         if (int_to_bool(i)) {
-                            return evaluate_block(funcs, &block, callstack)
+                            match evaluate_block(funcs, &block, callstack) {
+                                Effect::Okay => (),
+                                Effect::Return(val) => return Effect::Return(val),
+                                Effect::Error(msg) =>return Effect::Error(msg),
+                            }
+                        }
+                        else {
+                            return Effect::Okay
                         }
                     }
                 }
@@ -327,7 +351,6 @@ fn evaluate_fun_call(
     param_vals: Vec<Expr>,
     callstack: &mut CallStack,
 ) -> Effect {
-    callstack.push_new_frame();
     if funcs.contains_key(fun) {
         match param_vals
             .into_iter()
@@ -341,6 +364,7 @@ fn evaluate_fun_call(
                     for key_val in zipped {
                         hash_map.insert(key_val.0.clone(), Some(key_val.1.clone()));
                     }
+                    callstack.push_new_frame();
                     callstack.push_new_scope(Scope(hash_map));
                 } else {
                     return Effect::Error("The amount of parameters is not the same as the amount of expressions supplied.".to_string());
@@ -354,7 +378,13 @@ fn evaluate_fun_call(
         return Effect::Error("Tried to call a non existing function".to_string());
     }
     match evaluate_block(funcs, &funcs.get(fun).expect("Checked for this").1, callstack) {
-        Effect::Return(val) => {evaluate_assign(var, val, callstack)},
+        Effect::Return(val) => { match evaluate_expr(val, callstack) {
+            Ok(c) => {callstack.0.pop(); match callstack.set_var(&var, &c) {
+                Ok(()) => Effect::Okay,
+                Err(msg) => Effect::Error(msg.to_string()),
+            }},
+            Err(msg) => return Effect::Error(msg),
+        }},
         Effect::Error(msg) => Effect::Error(msg),
         _ => Effect::Error("Current function branch does not have a return".to_string()),
     }
