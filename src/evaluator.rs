@@ -66,17 +66,17 @@ impl CallStack {
     }
 
     fn set_var(&mut self, id: &Id, constant: &Constant) -> Result<(), String> {
+
         for scope in self.get_last_frame().iter_mut().rev() {
-            if let Some(_) = scope.0.insert(id.clone(), Some(constant.clone())) {
-                return Ok(());
+            if let Some(val) = scope.clone().0.get(&id) {
+                scope.0.insert(id.clone(), Some(constant.clone()));
+                return Ok(())
             }
         }
-        if let Some(_) = self.get_global_scope().0.insert(
-            id.clone(),
-            Some(constant.clone()),
-        )
-        {
-            return Ok(());
+
+        if let Some(old_val) = self.get_global_scope().clone().0.get(&id) {
+            self.get_global_scope().0.insert(id.clone(), Some(constant.clone()));
+            return Ok(())
         }
         Err("Bound a variable before initializing it".to_string())
     }
@@ -149,61 +149,51 @@ fn evaluate_cmds(
     cmds: &Vec<Cmd>,
     callstack: &mut CallStack,
 ) -> Effect {
-    let mut effect: Option<Effect> = None;
     for cmd in cmds.iter() {
-        println!("{:#?}",  callstack);
-        match *cmd {
-            Cmd::Read(_) => println!("Warning! Reading is not supported!"),
+        let effect = match *cmd {
+            Cmd::Read(_) => {println!("Warning! Reading is not supported!"); Effect::Okay},
             Cmd::Write(ref id) => {match callstack.lookup(id) {
-                Some(c)  => {effect = Some(Effect::Okay); println!("{:?}", c);},
-                None => effect = Some(Effect::Error(format!("Tried to print variable without defining it {:?}", id))),
+                Some(c)  => {println!("{:?}", c); Effect::Okay},
+                None => Effect::Error(format!("Tried to print variable without defining it {}", id.string())),
             }}
-            Cmd::Block(ref block) => effect = Some(evaluate_block(funcs, block, callstack)),
-            Cmd::Return(ref expr) => {
-                callstack.get_last_frame().pop();
-                return Effect::Return(Expr::from(expr.clone()));
-            }
+            Cmd::Block(ref block) => evaluate_block(funcs, block, callstack),
+            Cmd::Return(ref expr) => Effect::Return(Expr::from(expr.clone())),
             Cmd::While {
                 ref expr,
                 ref block,
             } => {
-                effect = Some(evaluate_while(
+                evaluate_while(
                     funcs,
                     Expr::from(expr.clone()),
                     Block::from(block.clone()),
                     callstack,
-                ))
+                )
             }
             Cmd::If {
                 ref expr,
                 ref block,
             } => {
-                effect = Some(evaluate_if(
+                evaluate_if(
                     funcs,
                     Expr::from(expr.clone()),
                     Block::from(block.clone()),
                     callstack,
-                ))
+                )
             }
             Cmd::Assignment { ref var, ref expr } => {
-                effect = Some(evaluate_assign(var, Expr::from(expr.clone()), callstack))
+                evaluate_assign(var, Expr::from(expr.clone()), callstack)
             }
             Cmd::FunCall {
                 ref var,
                 ref fun,
                 ref exprs,
-            } => effect = Some(evaluate_fun_call(funcs, var, fun, exprs.clone().into_iter().map(Expr::from).collect(), callstack)),
+            } => evaluate_fun_call(funcs, var, fun, exprs.clone().into_iter().map(Expr::from).collect(), callstack),
+        };
+        match effect {
+            Effect::Okay => (),
+            Effect::Error(msg) => return Effect::Error(msg),
+            Effect::Return(val) => return Effect::Return(val),
         }
-        if let &Some(ref eff) = &effect {
-            match *eff {
-                Effect::Okay => (),
-                Effect::Error(ref msg) => return Effect::Error(msg.clone()),
-                Effect::Return(_) => {
-                    panic!("Somehow got a return effect from a command that is not return")
-                }
-            }
-        }
-
     }
     Effect::Okay
 }
@@ -215,9 +205,11 @@ fn evaluate_block(
 ) -> Effect {
     let local_scope = Scope::new(&block.vars.clone());
     callstack.push_new_scope(local_scope);
-    let effect = evaluate_cmds(funcs, &block.cmds, callstack);
-    callstack.get_last_frame().pop();
-    effect
+    match evaluate_cmds(funcs, &block.cmds, callstack) {
+        Effect::Okay => {callstack.get_last_frame().pop(); Effect::Okay},
+        Effect::Return(val) => Effect::Return(val),
+        Effect::Error(msg) => Effect::Error(msg),
+    }
 }
 
 fn evaluate_while(
@@ -226,42 +218,29 @@ fn evaluate_while(
     block: Block,
     callstack: &mut CallStack,
 ) -> Effect {
-    match evaluate_expr(expr, callstack) {
-        Ok(c) => {
-            match c {
-                Constant::Bool(b) => {
-                    while (b) {
-                        match evaluate_block(funcs, &block, callstack) {
-                            Effect::Okay => (),
-                            Effect::Return(val) => return Effect::Return(val),
-                            Effect::Error(msg) => return Effect::Error(msg),
+    loop {
+        match evaluate_expr(expr.clone(), callstack) {
+            Ok(c) => {
+                match c {
+                    Constant::Bool(b) => {
+                        if (b) {
+                            return evaluate_block(funcs, &block, callstack)
                         }
                     }
-                    return Effect::Okay;
-                }
-                Constant::Real(r) => {
-                    while real_to_bool(r) {
-                        match evaluate_block(funcs, &block, callstack) {
-                            Effect::Okay => (),
-                            Effect::Return(val) => return Effect::Return(val),
-                            Effect::Error(msg) => return Effect::Error(msg),
+                    Constant::Real(r) => {
+                        if (real_to_bool(r)) {
+                            return evaluate_block(funcs, &block, callstack)
                         }
                     }
-                    return Effect::Okay;
-                }
-                Constant::Int(i) => {
-                    while int_to_bool(i) {
-                        match evaluate_block(funcs, &block, callstack) {
-                            Effect::Okay => (),
-                            Effect::Return(val) => return Effect::Return(val),
-                            Effect::Error(msg) => return Effect::Error(msg),
+                    Constant::Int(i) => {
+                        if (int_to_bool(i)) {
+                            return evaluate_block(funcs, &block, callstack)
                         }
                     }
-                    return Effect::Okay;
                 }
             }
+            Err(msg) => return Effect::Error(msg),
         }
-        Err(msg) => Effect::Error(msg),
     }
 }
 
@@ -321,11 +300,11 @@ pub fn bool_to_real(b: bool) -> f64 {
     if b { 1.0 } else { 0.0 }
 }
 
-fn real_to_bool(real: f64) -> bool {
+pub fn real_to_bool(real: f64) -> bool {
     real != 0.0
 }
 
-fn int_to_bool(int: i64) -> bool {
+pub fn int_to_bool(int: i64) -> bool {
     int != 0
 }
 
@@ -375,7 +354,8 @@ fn evaluate_fun_call(
         return Effect::Error("Tried to call a non existing function".to_string());
     }
     match evaluate_block(funcs, &funcs.get(fun).expect("Checked for this").1, callstack) {
-        Effect::Return(val) => {callstack.0.pop(); evaluate_assign(var, val, callstack)},
+        Effect::Return(val) => {evaluate_assign(var, val, callstack)},
+        Effect::Error(msg) => Effect::Error(msg),
         _ => Effect::Error("Current function branch does not have a return".to_string()),
     }
 }
@@ -394,11 +374,11 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Int(i)),
                     Constant::Real(r) => Ok(Constant::Real(r)),
                 }
-                None => Err(format!("Null pointer. Did not bind a value to variable {:#?}", id)),
+                None => Err(format!("No value found for c. Did not bind a value to variable {}", id.string())),
 
             }
 
-            None => Err(format!("No such variable exists {:#?}", id)),
+            None => Err(format!("No such variable exists {}", id.string())),
         }
 
         Expr::NegId(nid) => match callstack.lookup(&nid) {
@@ -408,11 +388,51 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Int(i.checked_neg().expect("Cannot make such a large number negative"))),
                     Constant::Real(r) => Ok(Constant::Real(r * -0.1)),
                 }
-                None => Err(format!("Null pointer. Did not  bind a value to variable {:#?}", nid)),
+                None => Err(format!("No value found for c. Did not  bind a value to variable {}", nid.string())),
             }
-            None => Err(format!("No such variable exists {:#?}", nid)),
+            None => Err(format!("No such variable exists {}", nid.string())),
+        }
+        Expr::NotId(id) => match callstack.lookup(&id) {
+            Some(oc) => match oc {
+                Some(c) => match c {
+                    Constant::Bool(b) => Ok(Constant::Bool(!b)),
+                    Constant::Int(i) => Ok(Constant::Bool((!int_to_bool(i)))),
+                    Constant::Real(r) => Ok(Constant::Bool((!real_to_bool(r)))),
+                }
+                None => Err(format!("No value found for c. Did not bind a value to variable {}", id.string())),
+                }
+
+            None => Err(format!("No such variable exists {}", id.string())),
         }
 
+        Expr::NotNegId(nid) => match callstack.lookup(&nid) {
+            Some(oc) => match oc {
+                Some(c) => match c {
+                    Constant::Bool(b) => Ok(Constant::Bool((!b))),
+                    Constant::Int(i) => Ok(Constant::Bool((!int_to_bool(i.checked_neg().expect("Cannot make such a large number negative"))))),
+                    Constant::Real(r) => Ok(Constant::Bool((!real_to_bool(r)))),
+                }
+                None => Err(format!("No value found for c. Did not  bind a value to variable {}", nid.string())),
+            }
+            None => Err(format!("No such variable exists {}", nid.string())),
+        }
+        Expr::NotExpr(expr) => match evaluate_expr(*expr, callstack) {
+            Ok(c) => match c {
+                Constant::Bool(b) => Ok(Constant::Bool((!b))),
+                Constant::Int(i) => Ok(Constant::Bool((!int_to_bool(i)))),
+                Constant::Real(r) => Ok(Constant::Bool((!real_to_bool(r)))),
+            }
+            Err(msg) => Err(msg),
+        }
+
+        Expr::NotNegExpr(expr) => match evaluate_expr(*expr, callstack) {
+                    Ok(c) => match c {
+                        Constant::Bool(b) => Ok(Constant::Int((bool_to_int(!b) * -1))),
+                        Constant::Int(i) => Ok(Constant::Int((bool_to_int(!int_to_bool(i))))),
+                        Constant::Real(r) => Ok(Constant::Real((bool_to_real(!real_to_bool(r))))),
+                    }
+                    Err(msg) => Err(msg),
+                }
         Expr::BinOp(l, bo, r) => match bo {
             BinOp::Add => Ok(add_constants(match evaluate_expr(*l, callstack) {
                Ok(c) => c,
@@ -689,7 +709,7 @@ fn nEqual_constants(c1: Constant, c2: Constant) -> Constant {
     }
 }
 
-fn greater_constants(c2: Constant, c1: Constant) -> Constant {
+fn greater_constants(c1: Constant, c2: Constant) -> Constant {
     match c1 {
         Constant::Real(r)  => match c2 {
             Constant::Real(r2) => Constant::Bool((r > r2)),
@@ -709,7 +729,7 @@ fn greater_constants(c2: Constant, c1: Constant) -> Constant {
     }
 }
 
-fn lesser_constants(c2: Constant, c1: Constant) -> Constant {
+fn lesser_constants(c1: Constant, c2: Constant) -> Constant {
     match c1 {
         Constant::Real(r)  => match c2 {
             Constant::Real(r2) => Constant::Bool((r < r2)),

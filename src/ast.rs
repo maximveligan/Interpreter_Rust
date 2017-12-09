@@ -1,4 +1,6 @@
 use parser::MulOp;
+use evaluator::real_to_bool;
+use evaluator::int_to_bool;
 use parser::AddOp;
 use parser::RelOp;
 use parser::SignOp;
@@ -10,15 +12,19 @@ use parser::Constant;
 use evaluator::bool_to_int;
 use parser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     BinOp(Box<Expr>, BinOp, Box<Expr>),
     Id(Id),
+    NotId(Id),
     Constant(Constant),
     NegId(Id),
+    NotNegId(Id),
+    NotExpr(Box<Expr>),
+    NotNegExpr(Box<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinOp {
     Add,
     Sub,
@@ -174,6 +180,10 @@ fn negative_from_expr(mut expr: Expr) -> Expr {
             panic!("This shouldn't be possible. Factor somehow created a negative id")
         }
         Expr::BinOp(l, c, tree) => Expr::BinOp(l, c, Box::new(negative_from_expr(*tree))),
+        Expr::NotExpr(expr) => Expr::NotNegExpr(expr),
+        Expr::NotId(id) => Expr::NotNegId(id),
+        Expr::NotNegId(_) => panic!("This shouldn't be possible. Factor somehow created a negative id"),
+        Expr::NotNegExpr(_) => panic!("This shouldn't be possible. Factor somehow created a negative id"),
     }
 }
 
@@ -220,6 +230,19 @@ fn expr_from_factor(factor: Factor) -> Expr {
         Factor::Constant(c) => Expr::Constant(c),
         Factor::Id(id) => Expr::Id(id),
         Factor::Expr(expr) => expr_from_parse_expr(*expr),
-        _ => panic!("Not sure what to do with not fac"),
+        Factor::NotFac(fac) => not_factor(*fac),
+    }
+}
+
+fn not_factor(factor: Factor) -> Expr {
+    match factor {
+        Factor::Constant(c) => match c {
+            Constant::Bool(b) => Expr::Constant(Constant::Bool((!b))),
+            Constant::Int(i) => Expr::Constant(Constant::Bool((!int_to_bool(i)))),
+            Constant::Real(r) => Expr::Constant(Constant::Bool((!real_to_bool(r)))),
+        }
+        Factor::Expr(expr) =>  Expr::NotExpr(Box::new(expr_from_parse_expr(*expr))),
+        Factor::NotFac(fac) => not_factor(*fac),
+        Factor::Id(id) => Expr::NotId(id),
     }
 }

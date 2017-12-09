@@ -9,6 +9,11 @@ use token::Punctuation;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct Id(String);
+impl Id {
+    pub fn string(&self) -> String {
+        self.0.clone()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Function {
