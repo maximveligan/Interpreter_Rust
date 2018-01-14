@@ -4,7 +4,7 @@ This is a simple interpreted programming language based off of Ada syntax writte
 
 # Details
 
-This language is implemented using nom to generate tokens. It then uses a recursive descent parser to generate a parse tree, and finally generates an ast using the parse tree. It is then evaluated. The language does not have types, and converts data as needed in order to execute binary operations.
+This language is implemented using the nom crate to generate tokens. It then uses a recursive descent parser to generate a parse tree, and finally generates an abstract syntax tree based on the parse tree. It is then evaluated. The language does not have types, and converts data as needed in order to execute binary operations. Right now, the language supports real numbers, integers, and booleans.
 
 # Installation
 
