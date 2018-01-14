@@ -38,11 +38,17 @@ Example: x := call test(1, 4.0, true);
 ### Supported commands
 
 call: Check section "Function declarations and calls"
+
 return: Check section "Function declarations and calls"
+
 write: Prints out the expression to stdout.
+
 block: Declares a new block and local scope. Every new block is considered a new scope and is denoted using curly braces {}.
+
 if: If the condition following the keyword "if" evaluates to true, the following block is executed.
+
 while: Executes the following block of code while the expression following the "while" keyword evaluates to true.
+
 assignment: Check section "Variable assigning"
 
 ### Unsupported commands
