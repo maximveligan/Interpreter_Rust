@@ -176,7 +176,7 @@ fn parse_var(mut input: &[Token]) -> Result<(&[Token], HashSet<Id>), String> {
     match input.split_first() {
         Some((&Token::Punctuation(Punctuation::Semicolon), rest)) => Ok((rest, id_list)),
         Some((token, _)) => Err(format!("Syntax error. Expected ; token. Found {:?}", token)),
-        _ => Err("Unexpected eof".to_string()),
+        _ => Err("Unexpected eof. Expected semicolon.".to_string()),
     }
 }
 
@@ -235,7 +235,7 @@ fn parse_func(mut input: &[Token]) -> Result<(&[Token], Function), String> {
 
     match rest.split_first() {
         Some((&Token::Punctuation(Punctuation::OpenParen), tail)) => input = tail,
-        Some((token, _)) => return Err(format!("Did not find a delimeter ).Found {:?}", token)),
+        Some((token, _)) => return Err(format!("Did not find a delimeter (.Found {:?}", token)),
         _ => return Err("Unexpected eof".to_string()),
     }
 
@@ -331,7 +331,7 @@ fn parse_cmd(mut input: &[Token]) -> Result<(&[Token], Cmd), String> {
                     Cmd::Return(expr)
                 })),
                 Some((token, _)) => return Err(format!("Missing token ;. Found {:?}", token)),
-                _ => return Err("Unexpected eof".to_string()),
+                _ => return Err("Unexpected eof. Did you forget a semicolon?".to_string()),
             }
         }
 
@@ -343,7 +343,7 @@ fn parse_cmd(mut input: &[Token]) -> Result<(&[Token], Cmd), String> {
                     Cmd::Read(id)
                 })),
                 Some((token, _)) => return Err(format!("Missing token ;. Found {:?}", token)),
-                _ => return Err("Unexpected eof".to_string()),
+                _ => return Err("Unexpected eof. Did you forget a semicolon?".to_string()),
             }
         }
 
@@ -355,7 +355,7 @@ fn parse_cmd(mut input: &[Token]) -> Result<(&[Token], Cmd), String> {
                     Cmd::Write(id)
                 })),
                 Some((token, _)) => return Err(format!("Missing token ;. Found {:?}", token)),
-                _ => return Err("Unexpected eof".to_string()),
+                _ => return Err("Unexpected eof. Did you forget a semicolon?".to_string()),
             }
         }
 
@@ -616,7 +616,7 @@ fn parse_id_cmd(mut input: &[Token]) -> Result<(&[Token], Cmd), String> {
     match rest.split_first() {
         Some((&Token::Punctuation(Punctuation::ColonEquals), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find colon equals. Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget a := ?".to_string()),
     }
     match parse_expr(input) {
         Ok((rest, new_expr)) => {
@@ -631,7 +631,7 @@ fn parse_id_cmd(mut input: &[Token]) -> Result<(&[Token], Cmd), String> {
                 )),
 
                 Some((token, _)) => Err(format!("Missing token ;. Found {:?}", token)),
-                _ => Err("Unexpected eof".to_string()),
+                _ => Err("Unexpected eof. Did you forget a semicolon?".to_string()),
             }
         }
         _ => {
@@ -645,12 +645,12 @@ fn parse_if(mut input: &[Token]) -> Result<(&[Token], Expr, Block), String> {
     match input.split_first() {
         Some((&Token::Keyword(Keyword::If), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find keyword if. Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget if?".to_string()),
     }
     match input.split_first() {
         Some((&Token::Punctuation(Punctuation::OpenParen), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find delimeter (. Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget an ( ?".to_string()),
     }
 
     let (rest, expr) = parse_expr(input)?;
@@ -658,7 +658,7 @@ fn parse_if(mut input: &[Token]) -> Result<(&[Token], Expr, Block), String> {
     match rest.split_first() {
         Some((&Token::Punctuation(Punctuation::CloseParen), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find delimeter ). Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget to close your delimeter?".to_string()),
     }
 
     let (tail, block) = parse_block(input)?;
@@ -670,7 +670,7 @@ fn parse_while(mut input: &[Token]) -> Result<(&[Token], Expr, Block), String> {
     match input.split_first() {
         Some((&Token::Keyword(Keyword::While), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find keyword while. Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forgt the word while?".to_string()),
     }
     match input.split_first() {
         Some((&Token::Punctuation(Punctuation::OpenParen), rest)) => {
@@ -679,13 +679,13 @@ fn parse_while(mut input: &[Token]) -> Result<(&[Token], Expr, Block), String> {
             input = tail;
         }
         Some((token, _)) => return Err(format!("Did not find delimeter (. Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget a ( ?".to_string()),
     }
 
     match input.split_first() {
         Some((&Token::Punctuation(Punctuation::CloseParen), rest)) => input = rest,
         Some((token, _)) => return Err(format!("Did not find delimeter ). Found {:?}", token)),
-        _ => return Err("Unexpected eof".to_string()),
+        _ => return Err("Unexpected eof. Did you forget a ) ?".to_string()),
     }
 
     let (tail, block) = parse_block(input)?;

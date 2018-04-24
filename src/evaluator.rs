@@ -404,7 +404,7 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Int(i)),
                     Constant::Real(r) => Ok(Constant::Real(r)),
                 }
-                None => Err(format!("No value found for c. Did not bind a value to variable {}", id.string())),
+                None => Err(format!("Null pointer error. No value found for variable {}.", id.string())),
 
             }
 
@@ -418,7 +418,7 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Int(i.checked_neg().expect("Cannot make such a large number negative"))),
                     Constant::Real(r) => Ok(Constant::Real(r * -0.1)),
                 }
-                None => Err(format!("No value found for c. Did not  bind a value to variable {}", nid.string())),
+                None => Err(format!("No value found for variable {}. Did you to initialize it?", nid.string())),
             }
             None => Err(format!("No such variable exists {}", nid.string())),
         }
@@ -429,7 +429,7 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Bool((!int_to_bool(i)))),
                     Constant::Real(r) => Ok(Constant::Bool((!real_to_bool(r)))),
                 }
-                None => Err(format!("No value found for c. Did not bind a value to variable {}", id.string())),
+                None => Err(format!("No value found for variable {}. Did not initialize it.", id.string())),
                 }
 
             None => Err(format!("No such variable exists {}", id.string())),
@@ -442,7 +442,7 @@ fn evaluate_expr(expr: Expr, callstack: &mut CallStack) -> Result<Constant, Stri
                     Constant::Int(i) => Ok(Constant::Bool((!int_to_bool(i.checked_neg().expect("Cannot make such a large number negative"))))),
                     Constant::Real(r) => Ok(Constant::Bool((!real_to_bool(r)))),
                 }
-                None => Err(format!("No value found for c. Did not  bind a value to variable {}", nid.string())),
+                None => Err(format!("No value found for variable {}. Did not bind a value to it.", nid.string())),
             }
             None => Err(format!("No such variable exists {}", nid.string())),
         }
