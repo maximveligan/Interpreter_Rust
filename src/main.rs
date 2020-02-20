@@ -21,6 +21,7 @@ fn main() {
     let mut buffer = String::new();
     io::stdin().read_to_string(&mut buffer).expect("Read error");
     let tokens: Vec<Token> = get_tokens(&buffer);
+    read_tokens(&tokens);
 
     match parse_program(&tokens) {
         Ok(program) => {

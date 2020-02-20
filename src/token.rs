@@ -131,7 +131,7 @@ pub fn read_tokens(tokens: &Vec<Token>) -> () {
             Token::Punctuation(Punctuation::Coma) => println!(","),
             Token::Punctuation(Punctuation::Plus) => println!("+"),
             Token::Punctuation(Punctuation::Minus) => println!("-"),
-            Token::Punctuation(Punctuation::Multiply) => println!("*)"),
+            Token::Punctuation(Punctuation::Multiply) => println!("*"),
             Token::Punctuation(Punctuation::Divide) => println!("/"),
             Token::Punctuation(Punctuation::Modulo) => println!("%"),
             Token::Punctuation(Punctuation::ColonEquals) => println!(":="),

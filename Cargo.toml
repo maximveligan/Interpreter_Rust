@@ -1,5 +1,5 @@
 [package]
-name = "scanner"
+name = "interpreter"
 version = "0.1.0"
 authors = ["grodion"]
 

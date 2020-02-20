@@ -1,0 +1,236 @@
+Keyword: Var
+Identifier: result
+;
+Keyword: Var
+Identifier: kek
+;
+Keyword: Fun
+Identifier: fac
+(
+Identifier: n
+)
+{
+Keyword: Var
+Identifier: z
+;
+Keyword: If
+(
+Identifier: n
+=
+Integer: 1
+)
+{
+Keyword: Return
+Integer: 1
+;
+}
+Identifier: z
+:=
+Keyword: Call
+Identifier: fac
+(
+Identifier: n
+-
+Integer: 1
+)
+;
+Keyword: Return
+Identifier: z
+*
+Identifier: n
+;
+}
+Identifier: result
+:=
+Keyword: Call
+Identifier: fac
+(
+Integer: 20
+)
+;
+Keyword: Write
+Identifier: result
+;
+Program parsed successfuly, here is the tree Program {
+    vars: {
+        Id(
+            "kek"
+        ),
+        Id(
+            "result"
+        )
+    },
+    funcs: [
+        Function {
+            id: Id(
+                "fac"
+            ),
+            parameters: [
+                Id(
+                    "n"
+                )
+            ],
+            block: Block {
+                vars: {
+                    Id(
+                        "z"
+                    )
+                },
+                cmds: [
+                    If {
+                        expr: Expr {
+                            simple_expr: SimpleExpr {
+                                sign: Pos,
+                                term: Term {
+                                    factor: Id(
+                                        Id(
+                                            "n"
+                                        )
+                                    ),
+                                    fac_chain: []
+                                },
+                                term_chain: []
+                            },
+                            relation: Some(
+                                (
+                                    Equal,
+                                    SimpleExpr {
+                                        sign: Pos,
+                                        term: Term {
+                                            factor: Constant(
+                                                Int(
+                                                    1
+                                                )
+                                            ),
+                                            fac_chain: []
+                                        },
+                                        term_chain: []
+                                    }
+                                )
+                            )
+                        },
+                        block: Block {
+                            vars: {},
+                            cmds: [
+                                Return(
+                                    Expr {
+                                        simple_expr: SimpleExpr {
+                                            sign: Pos,
+                                            term: Term {
+                                                factor: Constant(
+                                                    Int(
+                                                        1
+                                                    )
+                                                ),
+                                                fac_chain: []
+                                            },
+                                            term_chain: []
+                                        },
+                                        relation: None
+                                    }
+                                )
+                            ]
+                        }
+                    },
+                    FunCall {
+                        var: Id(
+                            "z"
+                        ),
+                        fun: Id(
+                            "fac"
+                        ),
+                        exprs: [
+                            Expr {
+                                simple_expr: SimpleExpr {
+                                    sign: Pos,
+                                    term: Term {
+                                        factor: Id(
+                                            Id(
+                                                "n"
+                                            )
+                                        ),
+                                        fac_chain: []
+                                    },
+                                    term_chain: [
+                                        (
+                                            Sub,
+                                            Term {
+                                                factor: Constant(
+                                                    Int(
+                                                        1
+                                                    )
+                                                ),
+                                                fac_chain: []
+                                            }
+                                        )
+                                    ]
+                                },
+                                relation: None
+                            }
+                        ]
+                    },
+                    Return(
+                        Expr {
+                            simple_expr: SimpleExpr {
+                                sign: Pos,
+                                term: Term {
+                                    factor: Id(
+                                        Id(
+                                            "z"
+                                        )
+                                    ),
+                                    fac_chain: [
+                                        (
+                                            Mul,
+                                            Id(
+                                                Id(
+                                                    "n"
+                                                )
+                                            )
+                                        )
+                                    ]
+                                },
+                                term_chain: []
+                            },
+                            relation: None
+                        }
+                    )
+                ]
+            }
+        }
+    ],
+    cmds: [
+        FunCall {
+            var: Id(
+                "result"
+            ),
+            fun: Id(
+                "fac"
+            ),
+            exprs: [
+                Expr {
+                    simple_expr: SimpleExpr {
+                        sign: Pos,
+                        term: Term {
+                            factor: Constant(
+                                Int(
+                                    20
+                                )
+                            ),
+                            fac_chain: []
+                        },
+                        term_chain: []
+                    },
+                    relation: None
+                }
+            ]
+        },
+        Write(
+            Id(
+                "result"
+            )
+        )
+    ]
+}
+Some(Int(2432902008176640000))
+Evaluated successfuly

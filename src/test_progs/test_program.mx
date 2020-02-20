@@ -1,11 +1,12 @@
 var result;
-fun fac(n) {
-    var z;
-    if (n = 1) {
-        return 1;
-    }
-    z := call fac(n-1);
-    return z * n;
-}
+
+var g;
+var h;
+
+
+h := 5;
+g := g + 5;
+
+
 result := call fac(20);
 write result;
